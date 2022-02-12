@@ -1,0 +1,16 @@
+ 
+image:
+  file: .gitpod.Dockerfile
+tasks:
+  - init: echo "nothing to do"
+vscode:
+  extensions:
+    # Global
+    - usernamehw.errorlens
+    # Rust
+    - matklad.rust-analyzer
+    - serayuzgur.crates
+    # Java
+    - redhat.java
+    - vscjava.vscode-java-debug
+    - vscjava.vscode-maven
