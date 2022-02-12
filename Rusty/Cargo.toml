@@ -1,4 +1,14 @@
 [package]
 edition = "2021"
-name = "Rusty-Meet-Up"
+name = "rusty-meet-up"
 version = "0.1.0"
+
+[dependencies]
+actix-web = "3.3.3"
+actix-cors = "0.5.4"
+
+log = "0.4"
+log4rs = "1.0.0"
+
+dotenv = "0.15.0"
+
