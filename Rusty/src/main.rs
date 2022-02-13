@@ -1,19 +1,84 @@
-use std::{env, io::Result, time::Instant};
+use std::{
+    collections::HashMap,
+    env,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use actix_cors::Cors;
-use actix_web::{get, App, HttpResponse, HttpServer};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer};
 use dotenv::dotenv;
 use log::{error, info, warn};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+// AppState Struct, holding the "Db"
+struct AppState {
+    map: Mutex<HashMap<String, String>>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Token {
+    token: String,
+    user: String,
+}
+
+#[derive(Deserialize)]
+struct LoginData {
+    username: String,
+    password: String,
+}
+
+#[post("/login")]
+async fn login(state: web::Data<AppState>, data: String) -> HttpResponse {
+    info!("In Login service");
+
+    let login_data: LoginData = serde_json::from_str(&data).unwrap();
+    if login_data.password == "test" {
+        if let Ok(mut map) = state.map.lock() {
+            let token = Uuid::new_v4().to_string();
+            map.insert(token.clone(), login_data.username.clone());
+
+            return HttpResponse::Ok().json(Token {
+                token,
+                user: login_data.username,
+            });
+        }
+        HttpResponse::InternalServerError().body("")
+    } else {
+        HttpResponse::Forbidden().body("")
+    }
+}
+
+#[get("/check/{token}")]
+async fn check_token(
+    state: web::Data<AppState>,
+    web::Path(token): web::Path<String>,
+) -> HttpResponse {
+    info!("In check service");
+    info!("Checking {} token", token);
+    if let Ok(map) = state.map.lock() {
+        let token_option = map.get(&token);
+
+        if let Some(saved_token) = token_option {
+            return HttpResponse::Ok().body(saved_token);
+        } else {
+            return HttpResponse::NotFound().body("");
+        }
+    }
+    HttpResponse::InternalServerError().body("")
+}
 
 #[get("/")]
 async fn hello() -> HttpResponse {
     info!("In Hello service");
+
     HttpResponse::Ok().body("Hello, World!")
 }
 
 // Declaring the main methode as the actix-web main
 #[actix_web::main]
-async fn main() -> Result<()> {
+async fn main() -> std::io::Result<()> {
     // Initialising the start time
     let start = Instant::now();
 
@@ -33,15 +98,30 @@ async fn main() -> Result<()> {
     };
     load_log4rs_file(&log_file);
 
+    // We build the AppState
+    let app_state = Arc::new(AppState {
+        map: Mutex::new(HashMap::new()),
+    });
+
+    // Server creation
     let server = HttpServer::new(move || {
+        // We build the CORS Rules
         let cors = Cors::default()
             .allow_any_origin()
             .send_wildcard()
             .allow_any_header()
             .allowed_methods(vec!["GET", "POST"])
             .max_age(3600);
-
-        App::new().wrap(cors).service(hello)
+        // We create the App
+        App::new()
+            // With the app_state
+            .data(app_state.clone())
+            // With the CORS filter
+            .wrap(cors)
+            // With the WS
+            .service(hello)
+            .service(login)
+            .service(check_token)
     })
     .bind("127.0.0.1:8080")?
     .run();
@@ -56,10 +136,10 @@ fn load_dot_env() {
     // Error on DotEnv -> use the env. Which is the default on Prod.
     match dotenv() {
         // If everything is ok, log and continue
-        Ok(_) => info!(".env file successfuly loaded"),
+        Ok(_) => println!(".env file successfuly loaded"),
         // In case of error, log and panic
         Err(error) => {
-            error!("An error occured while loading the .env file: {}", error);
+            println!("An error occured while loading the .env file: {}", error);
             panic!("Error on .env file loading");
         }
     }
