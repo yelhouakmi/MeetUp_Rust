@@ -15,6 +15,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.quarkus.logging.Log;
+
 @Path("/token")
 public class TokenResource {
 
@@ -25,7 +27,7 @@ public class TokenResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response login(LoginModel data) {
-        
+        Log.info("In Login service");
         if(data.getPassword().equals("test")){
             var token = UUID.randomUUID().toString();
             db.put(token, data.getUsername());
@@ -38,6 +40,8 @@ public class TokenResource {
     @GET
     @Path("/check/{token}")
     public Response check(@PathParam("token") String token) {
+        Log.info("In check service");
+        Log.info(String.format("Checking %s token", token));
 
         if(db.containsKey(token)) {
             var user = db.get(token);
