@@ -30,7 +30,7 @@ struct LoginData {
 }
 
 #[post("/login")]
-async fn login(state: web::Data<AppState>, data: String) -> HttpResponse {
+async fn login(state: web::Data<Arc<AppState>>, data: String) -> HttpResponse {
     info!("In Login service");
 
     let login_data: LoginData = serde_json::from_str(&data).unwrap();
@@ -52,7 +52,7 @@ async fn login(state: web::Data<AppState>, data: String) -> HttpResponse {
 
 #[get("/check/{token}")]
 async fn check_token(
-    state: web::Data<AppState>,
+    state: web::Data<Arc<AppState>>,
     web::Path(token): web::Path<String>,
 ) -> HttpResponse {
     info!("In check service");
@@ -120,8 +120,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             // With the WS
             .service(hello)
-            .service(login)
-            .service(check_token)
+            .service(web::scope("/token").service(login).service(check_token))
     })
     .bind("127.0.0.1:8080")?
     .run();
