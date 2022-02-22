@@ -23,7 +23,7 @@ struct Token {
     user: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct LoginData {
     username: String,
     password: String,
@@ -151,5 +151,84 @@ fn load_log4rs_file(log_file: &str) {
             error!("Error while loading the log4rs configuration: {}", error);
             panic!("Error loading log4rs config");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+    use actix_web::{test, web::Bytes, http::StatusCode};
+
+    #[actix_rt::test]
+    async fn test_hello_ok() {
+        let mut app = test::init_service(App::new().service(hello)).await;
+
+        let req = test::TestRequest::get().uri("/").to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let result = test::read_body(resp).await;
+        assert_eq!(result, Bytes::from_static(b"Hello, World!"));
+    }
+
+    #[actix_rt::test]
+    async fn test_login_500() {
+        let mut app = test::init_service(App::new().service(login)).await;
+
+        let login_data = LoginData { username: "User".to_string(), password: "test".to_string()};
+        let req = test::TestRequest::post().uri("/login").set_json(&login_data).to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[actix_rt::test]
+    async fn should_login() {
+        let mut app = test::init_service(App::new().data(Arc::new( AppState { map: Mutex::new(HashMap::new())})).service(login)).await;
+
+        let user = "User".to_string();
+        let login_data = LoginData { username: user.clone(), password: "test".to_string()};
+        let req = test::TestRequest::post().uri("/login").set_json(&login_data).to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let result: Token = test::read_body_json(resp).await;
+        assert_eq!(result.user, user);
+    }
+
+    #[actix_rt::test]
+    async fn should_fail_login() {
+        let mut app = test::init_service(App::new().data(Arc::new( AppState { map: Mutex::new(HashMap::new())})).service(login)).await;
+
+        let login_data = LoginData { username: "User".to_string(), password: "nope".to_string()};
+        let req = test::TestRequest::post().uri("/login").set_json(&login_data).to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[actix_rt::test]
+    async fn should_check() {
+        let token = "token".to_string();
+        let user = "user".to_string();
+
+        let mut data = HashMap::new();
+        data.insert(token.clone(), user.clone());
+        let app_data = Arc::new( AppState { map: Mutex::new(data)});
+
+        let mut app = test::init_service(App::new().data(app_data).service(check_token)).await;
+
+        let req = test::TestRequest::get().uri(format!("/check/{}", token).as_str()).to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[actix_rt::test]
+    async fn should_fail_check() {
+        let mut app = test::init_service(App::new().data(Arc::new( AppState { map: Mutex::new(HashMap::new())})).service(check_token)).await;
+
+        let token = "nope";
+
+        let req = test::TestRequest::get().uri(format!("/check/{}", token).as_str()).to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 }
