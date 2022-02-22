@@ -5,11 +5,8 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.is;
 
 import javax.ws.rs.core.Response.Status;
-
-import org.jboss.resteasy.reactive.RestResponse.StatusCode;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 
